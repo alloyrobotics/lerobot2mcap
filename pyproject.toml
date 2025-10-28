@@ -1,0 +1,27 @@
+[project]
+name = "lerobot2mcap"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "lerobot>=0.3.3",
+    "tabular2mcap>=0.1.2",
+]
+
+[project.scripts]
+lerobot2mcap = "lerobot2mcap:main"
+
+[tool.setuptools]
+packages = ["lerobot2mcap"]
+
+[tool.setuptools.package-data]
+"*" = ["../configs/*.yaml"]
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+hardware = [
+    "lerobot[feetech]>=0.3.3",
+]

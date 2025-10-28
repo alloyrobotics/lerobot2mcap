@@ -1,0 +1,25 @@
+# Mapping configuration for tabular data to MCAP conversion
+# This file defines how different CSV files should be processed and converted
+
+writer_format: "ros2"  # Output format: ros1, ros2, json, or protobuf. Other formats are not supported yet.
+
+# Tabular data mappings
+tabular_mappings:
+  - file_pattern: '**/{{ episode_id }}.parquet'
+    converter_functions:
+      - function_name: "row_to_message_with_timestamp"
+        schema_name: null
+        topic_suffix: "Data"
+        exclude_columns:
+          - "timestamp"
+
+other_mappings:
+  - type: "compressed_video"
+    file_pattern: '**/{{ episode_id }}.mp4'
+    topic_suffix: "CompressedVideo"
+    frame_id: "camera"
+    format: "h264"
+
+attachments: []
+
+metadata: []
