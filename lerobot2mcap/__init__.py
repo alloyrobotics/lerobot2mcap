@@ -46,7 +46,10 @@ def convert_dataset(
     episodes: list[int] | None = None,
 ) -> bool:
     """
-    Convert a LeRobot dataset to MCAP format (episode-based).
+    Convert a LeRobot dataset to MCAP format.
+    Iterates through each chunk and converts all episodes within that chunk.
+    Each episode produces a separate MCAP file in its own directory.
+
     Args:
         dataset_root: Root directory of the LeRobot dataset
         output_dir: Output directory for MCAP files

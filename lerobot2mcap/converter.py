@@ -78,7 +78,10 @@ class LeRobotConverter:
         episodes: list[int] | None = None,
     ) -> bool:
         """
-        Convert the LeRobot dataset to MCAP format (episode-based).
+        Convert the LeRobot dataset to MCAP format.
+        Iterates through each chunk and converts all episodes within that chunk.
+        Each episode produces a separate MCAP file in its own directory.
+
         Args:
             output_dir: Directory where MCAP files will be saved
             chunks: List of chunk indices to convert (None = all chunks)
@@ -87,7 +90,7 @@ class LeRobotConverter:
             True if conversion succeeded, False otherwise
         """
         logger.info("=" * SEPARATOR_WIDTH)
-        logger.info("LeRobot to MCAP Conversion (Episode-Based)")
+        logger.info("LeRobot to MCAP Conversion")
         logger.info("=" * SEPARATOR_WIDTH)
         logger.info(f"Dataset: {self.dataset_root}")
         logger.info(f"Output: {output_dir}")
@@ -142,61 +145,6 @@ class LeRobotConverter:
         logger.info("=" * SEPARATOR_WIDTH)
 
         return success_count > 0
-
-    def _convert_chunk(
-        self, chunk_idx: int, output_dir: Path, include_log: bool
-    ):
-        """
-        Convert a single chunk to MCAP.
-        Args:
-            chunk_idx: The chunk index to convert
-            output_dir: Output directory for MCAP files
-            include_log: Whether to include log file in conversion
-        Raises:
-            Exception: If chunk conversion fails
-        """
-        # Check if chunk files exist
-        chunk_files = self.dataset_info.get_chunk_files(chunk_idx, self.dataset_root)
-
-        if not chunk_files["parquet"].exists():
-            raise FileNotFoundError(
-                f"Parquet file not found: {chunk_files['parquet']}"
-            )
-
-        # Check video files
-        missing_videos = []
-        for video_key, video_path in chunk_files["videos"].items():
-            if not video_path.exists():
-                missing_videos.append(video_key)
-
-        if missing_videos:
-            logger.warning(
-                f"Chunk {chunk_idx}: Missing videos: {missing_videos}. "
-                "These will be skipped."
-            )
-
-        # Generate dynamic configuration (tabular2mcap will find and parse .log files)
-        chunk_config = self.config_generator.generate_chunk_config(
-            chunk_idx, include_log=include_log
-        )
-
-        # Save config file alongside MCAP output
-        config_path = output_dir / f"chunk-{chunk_idx:03d}_config.yaml"
-        with open(config_path, "w") as config_file:
-            yaml.dump(chunk_config, config_file, default_flow_style=False, sort_keys=False)
-
-        logger.info(f"Saved config: {config_path.name}")
-
-        # Use tabular2mcap's McapConverter
-        mcap_converter = McapConverter(config_path, self.converter_functions_path)
-
-        # Output MCAP path
-        output_mcap = output_dir / f"chunk-{chunk_idx:03d}.mcap"
-
-        logger.info(f"Converting chunk {chunk_idx} -> {output_mcap.name}")
-
-        # Convert
-        mcap_converter.convert(self.dataset_root, output_mcap)
 
     def _convert_episode(
         self, episode_idx: int, chunk_idx: int, output_dir: Path, include_log: bool
