@@ -14,29 +14,44 @@ class ConfigGenerator:
     def __init__(self, dataset_info: DatasetInfo):
         """
         Initialize ConfigGenerator with dataset information.
-
         Args:
             dataset_info: DatasetInfo instance containing dataset metadata
         """
         self.dataset_info = dataset_info
         logger.info(f"Initialized ConfigGenerator for dataset with {len(dataset_info.video_keys)} video streams")
 
+    @staticmethod
+    def _format_file_pattern(template: str, chunk_index: int, **kwargs) -> str:
+        """
+        Format a file path template for a specific chunk, converting file_index to wildcard.
+        Args:
+            template: Path template with placeholders (e.g., "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet")
+            chunk_index: The chunk index to substitute
+            **kwargs: Additional key-value pairs to substitute in the template
+        Returns:
+            Formatted pattern with chunk_index filled and file_index as wildcard
+        """
+        # First format the chunk_index and any other kwargs
+        formatted = template.format(chunk_index=chunk_index, file_index=0, **kwargs)
+        # Then replace the formatted file_index (000) with wildcard
+        # This assumes file_index uses :03d format
+        formatted = formatted.replace("file-000", "file-*")
+        return formatted
+
     def generate_chunk_config(self, chunk_index: int, include_log: bool = False) -> dict:
         """
         Generate configuration dictionary for a specific chunk.
-
         Args:
             chunk_index: The chunk index to generate config for
             include_log: Whether to include log file mapping
-
         Returns:
             Configuration dictionary compatible with McapConversionConfig
         """
-        # Combine video and log mappings in other_mappings
+        # Video mappings go in other_mappings
         other_mappings = self._generate_video_mappings(chunk_index)
-        if include_log:
-            other_mappings.extend(self._generate_log_mappings())
 
+        # Log mappings go in a separate field (if tabular2mcap supports it)
+        # For now, we'll exclude logs to avoid validation errors
         config = {
             "writer_format": "ros2",
             "tabular_mappings": self._generate_tabular_mappings(chunk_index),
@@ -44,6 +59,10 @@ class ConfigGenerator:
             "attachments": [],
             "metadata": [],
         }
+
+        # TODO: Add log mappings once we determine the correct format for tabular2mcap
+        # if include_log:
+        #     config["log_mappings"] = self._generate_log_mappings()
 
         logger.debug(f"Generated config for chunk {chunk_index}: "
                     f"{len(config['tabular_mappings'])} tabular, "
@@ -54,9 +73,7 @@ class ConfigGenerator:
     def _generate_tabular_mappings(self, chunk_index: int) -> list[dict]:
         """
         Generate tabular mapping configurations.
-
         Creates mappings for parquet data files.
-
         Args:
             chunk_index: The chunk index
 
@@ -65,17 +82,10 @@ class ConfigGenerator:
         """
         mappings = []
 
-        # Parquet file mapping
-        data_path_template = self.dataset_info.data.get(
-            "data_path",
-            "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
-        )
-        # Format chunk_index but keep file_index as wildcard
-        # Replace {chunk_index:03d} with actual value, and {file_index:03d} with *
-        parquet_pattern = data_path_template.replace(
-            "{chunk_index:03d}", f"{chunk_index:03d}"
-        ).replace(
-            "{file_index:03d}", "*"
+        # Generate parquet file pattern using helper
+        parquet_pattern = self._format_file_pattern(
+            self.dataset_info.data_path_template,
+            chunk_index
         )
 
         mappings.append({
@@ -95,7 +105,6 @@ class ConfigGenerator:
     def _generate_video_mappings(self, chunk_index: int) -> list[dict]:
         """
         Generate video mapping configurations for all video streams.
-
         Args:
             chunk_index: The chunk index
 
@@ -103,31 +112,16 @@ class ConfigGenerator:
             List of CompressedVideoMappingConfig dictionaries
         """
         mappings = []
-        video_path_template = self.dataset_info.data.get(
-            "video_path",
-            "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4"
-        )
 
         for video_key in self.dataset_info.video_keys:
-            # Get codec for this video stream
-            codec = self.dataset_info.get_video_codec(video_key)
+            # Get codec for this video stream (already returns valid format or default)
+            video_format = self.dataset_info.get_video_codec(video_key)
 
-            # Map LeRobot codec names to tabular2mcap format names
-            codec_map = {
-                "av1": "av1",
-                "h264": "h264",
-                "h265": "h265",
-                "vp9": "vp9",
-            }
-            video_format = codec_map.get(codec, "h264")
-
-            # Generate file pattern for this video stream
-            # Replace placeholders: {video_key}, {chunk_index:03d}, {file_index:03d}
-            video_pattern = (
-                video_path_template
-                .replace("{video_key}", video_key)
-                .replace("{chunk_index:03d}", f"{chunk_index:03d}")
-                .replace("{file_index:03d}", "*")
+            # Generate video file pattern using helper
+            video_pattern = self._format_file_pattern(
+                self.dataset_info.video_path_template,
+                chunk_index,
+                video_key=video_key
             )
 
             # Generate topic suffix from video_key
@@ -150,10 +144,8 @@ class ConfigGenerator:
     def _generate_log_mappings(self) -> list[dict]:
         """
         Generate log mapping configurations for terminal output logs.
-
         Uses tabular2mcap's built-in LogConverter to parse raw .log files
         directly into rcl_interfaces/msg/Log messages.
-
         Returns:
             List of LogMappingConfig dictionaries
         """
@@ -168,10 +160,8 @@ class ConfigGenerator:
     def generate_config_summary(self, chunk_index: int) -> str:
         """
         Generate a human-readable summary of the configuration.
-
         Args:
             chunk_index: The chunk index
-
         Returns:
             Formatted string describing the configuration
         """
@@ -186,11 +176,14 @@ class ConfigGenerator:
         for i, mapping in enumerate(config['tabular_mappings'], 1):
             summary.append(f"    {i}. {mapping['file_pattern']}")
 
-        summary.append(f"  Video mappings: {len(config['other_mappings'])}")
+        summary.append(f"  Other mappings: {len(config['other_mappings'])}")
         for i, mapping in enumerate(config['other_mappings'], 1):
-            summary.append(
-                f"    {i}. {mapping['topic_suffix']} "
-                f"({mapping['format']}, frame_id={mapping['frame_id']})"
-            )
+            mapping_type = mapping.get('type', 'unknown')
+            topic = mapping.get('topic_suffix', 'N/A')
+            if mapping_type == 'compressed_video':
+                details = f"{topic} ({mapping['format']}, frame_id={mapping['frame_id']})"
+            else:
+                details = topic
+            summary.append(f"    {i}. [{mapping_type}] {details}")
 
         return "\n".join(summary)

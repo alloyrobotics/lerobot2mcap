@@ -23,15 +23,15 @@ PACKAGE_ROOT = Path(__file__).parent.parent
 DEFAULT_CONVERTER_FUNCTIONS = str(PACKAGE_ROOT / "configs" / "converter_functions.yaml")
 
 
-def download_dataset(dataset_id: str, output_dir: str, episodes: list[int] | None = None) -> bool:
-    """Download a lerobot dataset from Hugging Face Hub."""    
+def download_dataset(dataset_id: str, output_dir: Path, episodes: list[int] | None = None) -> bool:
+    """Download a lerobot dataset from Hugging Face Hub."""
     print(f"📥 Downloading: {dataset_id}")
     if episodes:
         print(f"   Episodes: {episodes}")
     print(f"   Output: {output_dir}")
-    
+
     try:
-        dataset = LeRobotDataset(dataset_id, root=output_dir, episodes=episodes)
+        dataset = LeRobotDataset(dataset_id, root=str(output_dir), episodes=episodes)
         print(f"✓ Episodes: {dataset.num_episodes}, Frames: {dataset.num_frames}, FPS: {dataset.fps}")
         return True
     except Exception as e:
@@ -46,13 +46,11 @@ def convert_dataset(
 ) -> bool:
     """
     Convert a LeRobot dataset to MCAP format (chunk-based).
-
     Args:
         dataset_root: Root directory of the LeRobot dataset
         output_dir: Output directory for MCAP files
         converter_functions_path: Path to converter_functions.yaml
         chunks: List of chunk indices to convert (None = all chunks)
-
     Returns:
         True if conversion succeeded, False otherwise
     """
@@ -75,8 +73,7 @@ def convert_dataset(
         # Perform conversion
         success = converter.convert(
             output_dir=output_dir,
-            chunks=chunks,
-            keep_temp_files=True
+            chunks=chunks
         )
 
         return success
@@ -105,22 +102,19 @@ def main():
     convert_parser.add_argument("-f", "--converter-functions", default=DEFAULT_CONVERTER_FUNCTIONS, help=f"Path to converter_functions.yaml file (default: {DEFAULT_CONVERTER_FUNCTIONS})")
 
     args = parser.parse_args()
+
     if args.command == "download":
-        if args.output_dir is None:
-            args.output_dir = Path("./data") / args.dataset_id
-        else:
-            args.output_dir = Path(args.output_dir)
-        return 0 if download_dataset(args.dataset_id, args.output_dir, args.episodes) else 1
-    elif args.command == "convert":
-        if args.output_dir is None:
-            args.output_dir = Path(args.input_dir) / "mcap"
-        else:
-            args.output_dir = Path(args.output_dir)
+        output_dir = Path(args.output_dir) if args.output_dir else Path("./data") / args.dataset_id
+        return 0 if download_dataset(args.dataset_id, output_dir, args.episodes) else 1
+
+    if args.command == "convert":
+        output_dir = Path(args.output_dir) if args.output_dir else Path(args.input_dir) / "mcap"
         return 0 if convert_dataset(
             Path(args.input_dir),
-            args.output_dir,
+            output_dir,
             Path(args.converter_functions),
             args.chunks
         ) else 1
+
     parser.print_help()
     return 0

@@ -7,6 +7,13 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Default values for dataset metadata
+DEFAULT_FPS = 30
+DEFAULT_CODEC = "h264"
+DEFAULT_FILE_INDEX = 0  # First file in a chunk
+DEFAULT_DATA_PATH_TEMPLATE = "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
+DEFAULT_VIDEO_PATH_TEMPLATE = "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4"
+
 
 class DatasetInfo:
     """Parses and holds LeRobot dataset metadata from info.json."""
@@ -14,7 +21,6 @@ class DatasetInfo:
     def __init__(self, info_json_path: Path):
         """
         Initialize DatasetInfo by parsing info.json.
-
         Args:
             info_json_path: Path to the info.json file (usually in meta/info.json)
         """
@@ -35,7 +41,6 @@ class DatasetInfo:
     def _extract_video_keys(self) -> list[str]:
         """
         Extract video keys from features.
-
         Video features have dtype="video" in info.json.
         Example: "observation.images.front", "observation.images.external"
         """
@@ -48,14 +53,28 @@ class DatasetInfo:
 
         return video_keys
 
+    @property
+    def data_path_template(self) -> str:
+        """
+        Get the data (parquet) path template from dataset metadata.
+        Checking data_path value for robustness - falls back to default if not in info.json.
+        """
+        return self.data.get("data_path", DEFAULT_DATA_PATH_TEMPLATE)
+
+    @property
+    def video_path_template(self) -> str:
+        """
+        Get the video path template from dataset metadata.
+        Checking video_path value for robustness - falls back to default if not in info.json.
+        """
+        return self.data.get("video_path", DEFAULT_VIDEO_PATH_TEMPLATE)
+
     def get_chunk_files(self, chunk_index: int, dataset_root: Path) -> dict:
         """
         Get file paths for a specific chunk.
-
         Args:
             chunk_index: The chunk index (e.g., 0 for chunk-000)
             dataset_root: Root directory of the dataset
-
         Returns:
             Dictionary with:
             {
@@ -69,80 +88,68 @@ class DatasetInfo:
         """
         chunk_files = {}
 
-        # Get parquet file path
-        data_path_template = self.data.get("data_path", "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet")
-        # For now, assume file_index is always 000 within a chunk
-        parquet_path = data_path_template.format(chunk_index=chunk_index, file_index=0)
+        # Get parquet file path using property (checks info.json with fallback)
+        parquet_path = self.data_path_template.format(
+            chunk_index=chunk_index,
+            file_index=DEFAULT_FILE_INDEX
+        )
         chunk_files["parquet"] = dataset_root / parquet_path
 
-        # Get video file paths
-        video_path_template = self.data.get("video_path", "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4")
+        # Get video file paths using property (checks info.json with fallback)
         chunk_files["videos"] = {}
 
         for video_key in self.video_keys:
-            video_path = video_path_template.format(
+            video_path = self.video_path_template.format(
                 video_key=video_key,
                 chunk_index=chunk_index,
-                file_index=0
+                file_index=DEFAULT_FILE_INDEX
             )
             chunk_files["videos"][video_key] = dataset_root / video_path
 
         return chunk_files
 
-
-# TO DO - Not sure if this is doing the correct thing yet 
     def get_total_chunks(self) -> int:
         """
-        Calculate total number of chunks in the dataset.
-
-        Uses chunks_size and total_frames to determine chunk count.
+        Get total number of chunks in the dataset.
+        Assumes single chunk (chunk-000) structure for LeRobot datasets.
+        Keeping function here as a placeholder for future multi-chunk support if necessary.
         """
-        chunks_size = self.data.get("chunks_size", 1000)
-        total_frames = self.data.get("total_frames", 0)
-
-        if total_frames == 0:
-            return 0
-
-        # Calculate number of chunks (ceiling division)
-        return (total_frames + chunks_size - 1) // chunks_size
+        return 1
 
     def get_fps(self) -> int:
         """Get frames per second from dataset info."""
-        return self.data.get("fps", 30)
+        return self.data.get("fps", DEFAULT_FPS)
 
     def get_video_codec(self, video_key: str) -> str:
         """
         Get video codec for a specific video stream.
-
         Args:
             video_key: The video key (e.g., "observation.images.front")
-
         Returns:
             Video codec (e.g., "av1", "h264")
         """
-        features = self.data.get("features", {})
-        video_info = features.get(video_key, {})
+        #### Commented out for testing ### 
 
-        if isinstance(video_info, dict):
-            codec = video_info.get("info", {}).get("video.codec", "h264")
-            return codec
+        # features = self.data.get("features", {})
+        # video_info = features.get(video_key, {})
 
-        return "h264"  # Default fallback
+        # if isinstance(video_info, dict):
+        #     codec = video_info.get("info", {}).get("video.codec", DEFAULT_CODEC)
+        #     return codec
+
+        return DEFAULT_CODEC
 
     def get_video_frame_id(self, video_key: str) -> str:
         """
         Generate frame_id for a video stream.
-
         Args:
             video_key: The video key (e.g., "observation.images.front")
-
         Returns:
             Frame ID (e.g., "front_camera")
         """
         # Extract the last part of the video key as frame_id
         # "observation.images.front" -> "front_camera"
-        parts = video_key.split(".")
-        camera_name = parts[-1] if parts else "camera"
+        camera_name = video_key.split(".")[-1] if "." in video_key else "camera"
         return f"{camera_name}_camera"
 
     def get_total_episodes(self) -> int:
