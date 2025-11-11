@@ -43,20 +43,24 @@ def convert_dataset(
     output_dir: Path,
     converter_functions_path: Path,
     chunks: list[int] | None = None,
+    episodes: list[int] | None = None,
 ) -> bool:
     """
-    Convert a LeRobot dataset to MCAP format (chunk-based).
+    Convert a LeRobot dataset to MCAP format (episode-based).
     Args:
         dataset_root: Root directory of the LeRobot dataset
         output_dir: Output directory for MCAP files
         converter_functions_path: Path to converter_functions.yaml
         chunks: List of chunk indices to convert (None = all chunks)
+        episodes: List of episode indices to convert (None = all episodes)
     Returns:
         True if conversion succeeded, False otherwise
     """
     print(f"🔄 Converting: {dataset_root}")
     if chunks:
         print(f"   Chunks: {chunks}")
+    if episodes:
+        print(f"   Episodes: {episodes}")
     print(f"   Output: {output_dir}")
     print(f"   Converter functions: {converter_functions_path}")
 
@@ -73,7 +77,8 @@ def convert_dataset(
         # Perform conversion
         success = converter.convert(
             output_dir=output_dir,
-            chunks=chunks
+            chunks=chunks,
+            episodes=episodes
         )
 
         return success
@@ -99,6 +104,7 @@ def main():
     convert_parser.add_argument("input_dir", help="Input directory containing LeRobot dataset (dataset root with meta/info.json)")
     convert_parser.add_argument("-o", "--output-dir", default=None, help="Output directory for MCAP files (default: input_dir/mcap)")
     convert_parser.add_argument("-c", "--chunks", type=int, nargs="+", help="Chunk IDs to convert (e.g., 0 1 2). If not specified, all chunks will be converted.")
+    convert_parser.add_argument("-e", "--episodes", type=int, nargs="+", help="Episode IDs to convert (e.g., 0 1 2). If not specified, all episodes will be converted.")
     convert_parser.add_argument("-f", "--converter-functions", default=DEFAULT_CONVERTER_FUNCTIONS, help=f"Path to converter_functions.yaml file (default: {DEFAULT_CONVERTER_FUNCTIONS})")
 
     args = parser.parse_args()
@@ -113,7 +119,8 @@ def main():
             Path(args.input_dir),
             output_dir,
             Path(args.converter_functions),
-            args.chunks
+            args.chunks,
+            args.episodes
         ) else 1
 
     parser.print_help()

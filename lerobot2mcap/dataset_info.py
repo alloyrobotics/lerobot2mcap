@@ -108,6 +108,46 @@ class DatasetInfo:
 
         return chunk_files
 
+    def get_episode_files(self, episode_index: int, chunk_index: int, dataset_root: Path) -> dict:
+        """
+        Get file paths for a specific episode within a chunk.
+        Args:
+            episode_index: The episode index (e.g., 0 for file-000, 1 for file-001)
+            chunk_index: The chunk index (e.g., 0 for chunk-000)
+            dataset_root: Root directory of the dataset
+        Returns:
+            Dictionary with:
+            {
+                "parquet": Path to parquet file,
+                "videos": {
+                    "observation.images.front": Path to video file,
+                    "observation.images.external": Path to video file,
+                    ...
+                }
+            }
+        """
+        episode_files = {}
+
+        # Get parquet file path using episode_index as file_index
+        parquet_path = self.data_path_template.format(
+            chunk_index=chunk_index,
+            file_index=episode_index
+        )
+        episode_files["parquet"] = dataset_root / parquet_path
+
+        # Get video file paths using episode_index as file_index
+        episode_files["videos"] = {}
+
+        for video_key in self.video_keys:
+            video_path = self.video_path_template.format(
+                video_key=video_key,
+                chunk_index=chunk_index,
+                file_index=episode_index
+            )
+            episode_files["videos"][video_key] = dataset_root / video_path
+
+        return episode_files
+
     def get_total_chunks(self) -> int:
         """
         Get total number of chunks in the dataset.
