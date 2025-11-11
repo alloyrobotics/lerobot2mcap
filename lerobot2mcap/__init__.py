@@ -1,19 +1,25 @@
 """LeRobot to MCAP converter."""
 
 import argparse
+import logging
 from importlib.metadata import version
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from tabular2mcap import McapConverter
-from tabular2mcap.loader import McapConversionConfig
 from pathlib import Path
-import yaml
-from jinja2 import Template
-from tqdm import tqdm
+
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+from .converter import LeRobotConverter
+
 __version__ = version("lerobot2mcap")
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Get the package root directory
 PACKAGE_ROOT = Path(__file__).parent.parent
-DEFAULT_CONFIG = str(PACKAGE_ROOT / "configs" / "config.yaml")
 DEFAULT_CONVERTER_FUNCTIONS = str(PACKAGE_ROOT / "configs" / "converter_functions.yaml")
 
 
@@ -32,38 +38,54 @@ def download_dataset(dataset_id: str, output_dir: str, episodes: list[int] | Non
         print(f"❌ Error: {e}")
         return False
 
-def modified_load_mcap_conversion_config(config_path: Path, episode_id: str) -> McapConversionConfig:
-    """Load and validate mapping configuration from YAML file"""
-    with open(config_path) as f:
-        template = Template(f.read())
-        config = yaml.safe_load(template.render(episode_id=episode_id))
-    return McapConversionConfig.model_validate(config)
+def convert_dataset(
+    dataset_root: Path,
+    output_dir: Path,
+    converter_functions_path: Path,
+    chunks: list[int] | None = None,
+) -> bool:
+    """
+    Convert a LeRobot dataset to MCAP format (chunk-based).
 
-def convert_dataset(input_dir: Path, output_dir: Path,
-                    config_path: Path, 
-                    converter_functions_path: Path,
-                    episodes: list[int] | None = None) -> bool:
-    """Convert a lerobot dataset to MCAP format."""
-    print(f"🔄 Converting: {input_dir}")
-    if episodes:
-        print(f"   Episodes: {episodes}")
+    Args:
+        dataset_root: Root directory of the LeRobot dataset
+        output_dir: Output directory for MCAP files
+        converter_functions_path: Path to converter_functions.yaml
+        chunks: List of chunk indices to convert (None = all chunks)
+
+    Returns:
+        True if conversion succeeded, False otherwise
+    """
+    print(f"🔄 Converting: {dataset_root}")
+    if chunks:
+        print(f"   Chunks: {chunks}")
     print(f"   Output: {output_dir}")
-    print(f"   Config: {config_path}")
     print(f"   Converter functions: {converter_functions_path}")
-    
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-    if episodes is None:
-        episode_ids = [p.stem for p in input_dir.glob("**/episode_*.parquet")]
-    else:
-        episode_ids = [f"episode_{episode_id:06d}" for episode_id in episodes]
-    for episode_id in tqdm(episode_ids, desc="Converting episodes"):
-        mcap_converter = McapConverter(config_path, converter_functions_path)
-        # mcap_config is loaded twice, once in the constructor which is overwritten by the modified_load_mcap_conversion_config function
-        mcap_converter.mcap_config = modified_load_mcap_conversion_config(config_path, episode_id)
-        mcap_converter.convert(input_dir, output_dir / f"{episode_id}.mcap")
 
-    return True
+    try:
+        # Initialize the converter with new OOP architecture
+        converter = LeRobotConverter(
+            dataset_root=dataset_root,
+            converter_functions_path=converter_functions_path
+        )
+
+        # Show conversion plan
+        print("\n" + converter.get_conversion_plan(chunks))
+
+        # Perform conversion
+        success = converter.convert(
+            output_dir=output_dir,
+            chunks=chunks,
+            keep_temp_files=True
+        )
+
+        return success
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def main():
@@ -77,12 +99,11 @@ def main():
     download_parser.add_argument("-e", "--episodes", type=int, nargs="+", help="Episode IDs to download (e.g., 0 1 2). If not specified, all episodes will be downloaded.")
     
     convert_parser = subparsers.add_parser("convert", help="Convert a LeRobot dataset to MCAP format")
-    convert_parser.add_argument("input_dir", help="Input directory containing LeRobot dataset")
-    convert_parser.add_argument("-o", "--output-dir", default=None, help="Output directory for MCAP files")
-    convert_parser.add_argument("-e", "--episodes", type=int, nargs="+", help="Episode IDs to convert (e.g., 0 1 2). If not specified, all episodes will be converted.")
-    convert_parser.add_argument("-c", "--config", default=DEFAULT_CONFIG, help=f"Path to config.yaml file (default: {DEFAULT_CONFIG})")
+    convert_parser.add_argument("input_dir", help="Input directory containing LeRobot dataset (dataset root with meta/info.json)")
+    convert_parser.add_argument("-o", "--output-dir", default=None, help="Output directory for MCAP files (default: input_dir/mcap)")
+    convert_parser.add_argument("-c", "--chunks", type=int, nargs="+", help="Chunk IDs to convert (e.g., 0 1 2). If not specified, all chunks will be converted.")
     convert_parser.add_argument("-f", "--converter-functions", default=DEFAULT_CONVERTER_FUNCTIONS, help=f"Path to converter_functions.yaml file (default: {DEFAULT_CONVERTER_FUNCTIONS})")
-    
+
     args = parser.parse_args()
     if args.command == "download":
         if args.output_dir is None:
@@ -95,6 +116,11 @@ def main():
             args.output_dir = Path(args.input_dir) / "mcap"
         else:
             args.output_dir = Path(args.output_dir)
-        return 0 if convert_dataset(Path(args.input_dir), args.output_dir, Path(args.config), Path(args.converter_functions), args.episodes) else 1
+        return 0 if convert_dataset(
+            Path(args.input_dir),
+            args.output_dir,
+            Path(args.converter_functions),
+            args.chunks
+        ) else 1
     parser.print_help()
     return 0
