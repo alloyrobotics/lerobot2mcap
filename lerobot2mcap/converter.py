@@ -29,7 +29,6 @@ class LeRobotConverter:
         self.dataset_root = dataset_root
         self.converter_functions_path = converter_functions_path
 
-        # Validate dataset structure
         info_json_path = dataset_root / "meta" / "info.json"
         if not info_json_path.exists():
             raise FileNotFoundError(
@@ -37,10 +36,10 @@ class LeRobotConverter:
                 f"Is {dataset_root} a valid LeRobot dataset?"
             )
 
-        # Composition: LeRobotConverter HAS-A DatasetInfo
+        # Import Dataset Info from dataset_info.py
         self.dataset_info = DatasetInfo(info_json_path)
 
-        # Composition: LeRobotConverter HAS-A ConfigGenerator
+        # Import Config Generator from config_generator.py
         self.config_generator = ConfigGenerator(self.dataset_info)
 
         # Find log file
@@ -126,12 +125,20 @@ class LeRobotConverter:
         fail_count = 0
 
         for chunk_idx in chunks:
-            for episode_idx in tqdm(episodes, desc=f"Converting episodes in chunk-{chunk_idx:03d}", unit="episode"):
+            for episode_idx in tqdm(
+                episodes,
+                desc=f"Converting episodes in chunk-{chunk_idx:03d}",
+                unit="episode",
+            ):
                 try:
-                    self._convert_episode(episode_idx, chunk_idx, output_dir, include_log)
+                    self._convert_episode(
+                        episode_idx, chunk_idx, output_dir, include_log
+                    )
                     success_count += 1
                 except Exception as e:
-                    logger.warning(f"Skipping episode {episode_idx} in chunk {chunk_idx}: {e}")
+                    logger.warning(
+                        f"Skipping episode {episode_idx} in chunk {chunk_idx}: {e}"
+                    )
                     fail_count += 1
 
         # Summary
@@ -160,7 +167,9 @@ class LeRobotConverter:
             Exception: If episode conversion fails
         """
         # Check if episode files exist
-        episode_files = self.dataset_info.get_episode_files(episode_idx, chunk_idx, self.dataset_root)
+        episode_files = self.dataset_info.get_episode_files(
+            episode_idx, chunk_idx, self.dataset_root
+        )
 
         if not episode_files["parquet"].exists():
             raise FileNotFoundError(
@@ -191,7 +200,9 @@ class LeRobotConverter:
         # Save config file: episode_000/config_000.yaml
         config_path = episode_dir / f"config_{episode_idx:03d}.yaml"
         with open(config_path, "w") as config_file:
-            yaml.dump(episode_config, config_file, default_flow_style=False, sort_keys=False)
+            yaml.dump(
+                episode_config, config_file, default_flow_style=False, sort_keys=False
+            )
 
         logger.info(f"Saved config: {config_path.relative_to(output_dir)}")
 
@@ -201,7 +212,9 @@ class LeRobotConverter:
         # Output MCAP path: episode_000/episode_000.mcap
         output_mcap = episode_dir / f"episode_{episode_idx:03d}.mcap"
 
-        logger.info(f"Converting episode {episode_idx} -> {output_mcap.relative_to(output_dir)}")
+        logger.info(
+            f"Converting episode {episode_idx} -> {output_mcap.relative_to(output_dir)}"
+        )
 
         # Convert
         mcap_converter.convert(self.dataset_root, output_mcap)
@@ -232,12 +245,14 @@ class LeRobotConverter:
             codec = self.dataset_info.get_video_codec(video_key)
             plan.append(f"  - {video_key} ({codec})")
 
-        plan.extend([
-            f"Log file: {'Yes' if self.log_file else 'No'}",
-            "",
-            f"Chunks to convert: {len(chunks)}",
-            "",
-        ])
+        plan.extend(
+            [
+                f"Log file: {'Yes' if self.log_file else 'No'}",
+                "",
+                f"Chunks to convert: {len(chunks)}",
+                "",
+            ]
+        )
 
         # Show config for first chunk as example
         if chunks:

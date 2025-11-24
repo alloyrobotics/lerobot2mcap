@@ -11,8 +11,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_FPS = 30
 DEFAULT_CODEC = "h264"
 DEFAULT_FILE_INDEX = 0  # First file in a chunk
-DEFAULT_DATA_PATH_TEMPLATE = "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
-DEFAULT_VIDEO_PATH_TEMPLATE = "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4"
+DEFAULT_DATA_PATH_TEMPLATE = (
+    "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
+)
+DEFAULT_VIDEO_PATH_TEMPLATE = (
+    "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4"
+)
 
 
 class DatasetInfo:
@@ -21,14 +25,24 @@ class DatasetInfo:
     def __init__(self, info_json_path: Path):
         """
         Initialize DatasetInfo by parsing info.json.
+
         Args:
             info_json_path: Path to the info.json file (usually in meta/info.json)
         """
-        self.info_json_path = info_json_path
-        self.data = self._parse_info_json()
-        self.video_keys = self._extract_video_keys()
-        logger.info(f"Loaded dataset info from {info_json_path}")
-        logger.info(f"Found {len(self.video_keys)} video streams: {self.video_keys}")
+        self.info_json_path = info_json_path  # Assign the info json address
+        self.data = (
+            self._parse_info_json()
+        )  # Load information from the info.json into the data member variable
+        self.video_keys = (
+            self._extract_video_keys()
+        )  # Extract keys of video dict - the names of your camera feeds
+
+        logger.info(
+            f"Loaded dataset info from {info_json_path}"
+        )  # Record info.json data extraction in file logs
+        logger.info(
+            f"Found {len(self.video_keys)} video streams: {self.video_keys}"
+        )  # Record number of keys and the key name strings
 
     def _parse_info_json(self) -> dict:
         """Parse the info.json file."""
@@ -72,9 +86,11 @@ class DatasetInfo:
     def get_chunk_files(self, chunk_index: int, dataset_root: Path) -> dict:
         """
         Get file paths for a specific chunk.
+
         Args:
             chunk_index: The chunk index (e.g., 0 for chunk-000)
             dataset_root: Root directory of the dataset
+
         Returns:
             Dictionary with:
             {
@@ -89,9 +105,12 @@ class DatasetInfo:
         chunk_files = {}
 
         # Get parquet file path using property (checks info.json with fallback)
+        # Support both v2.1 and v3 naming conventions
         parquet_path = self.data_path_template.format(
-            chunk_index=chunk_index,
-            file_index=DEFAULT_FILE_INDEX
+            episode_chunk=chunk_index,  # v2.1 format
+            episode_index=DEFAULT_FILE_INDEX,  # v2.1 format
+            chunk_index=chunk_index,  # v3 format
+            file_index=DEFAULT_FILE_INDEX,  # v3 format
         )
         chunk_files["parquet"] = dataset_root / parquet_path
 
@@ -99,22 +118,29 @@ class DatasetInfo:
         chunk_files["videos"] = {}
 
         for video_key in self.video_keys:
+            # Support both v2.1 and v3 naming conventions
             video_path = self.video_path_template.format(
                 video_key=video_key,
-                chunk_index=chunk_index,
-                file_index=DEFAULT_FILE_INDEX
+                episode_chunk=chunk_index,  # v2.1 format
+                episode_index=DEFAULT_FILE_INDEX,  # v2.1 format
+                chunk_index=chunk_index,  # v3 format
+                file_index=DEFAULT_FILE_INDEX,  # v3 format
             )
             chunk_files["videos"][video_key] = dataset_root / video_path
 
         return chunk_files
 
-    def get_episode_files(self, episode_index: int, chunk_index: int, dataset_root: Path) -> dict:
+    def get_episode_files(
+        self, episode_index: int, chunk_index: int, dataset_root: Path
+    ) -> dict:
         """
         Get file paths for a specific episode within a chunk.
+
         Args:
             episode_index: The episode index (e.g., 0 for file-000, 1 for file-001)
             chunk_index: The chunk index (e.g., 0 for chunk-000)
             dataset_root: Root directory of the dataset
+
         Returns:
             Dictionary with:
             {
@@ -129,9 +155,12 @@ class DatasetInfo:
         episode_files = {}
 
         # Get parquet file path using episode_index as file_index
+        # Support both v2.1 and v3 naming conventions
         parquet_path = self.data_path_template.format(
-            chunk_index=chunk_index,
-            file_index=episode_index
+            episode_chunk=chunk_index,  # v2.1 format
+            episode_index=episode_index,  # v2.1 format
+            chunk_index=chunk_index,  # v3 format
+            file_index=episode_index,  # v3 format
         )
         episode_files["parquet"] = dataset_root / parquet_path
 
@@ -139,10 +168,13 @@ class DatasetInfo:
         episode_files["videos"] = {}
 
         for video_key in self.video_keys:
+            # Support both v2.1 and v3 naming conventions
             video_path = self.video_path_template.format(
                 video_key=video_key,
-                chunk_index=chunk_index,
-                file_index=episode_index
+                episode_chunk=chunk_index,  # v2.1 format
+                episode_index=episode_index,  # v2.1 format
+                chunk_index=chunk_index,  # v3 format
+                file_index=episode_index,  # v3 format
             )
             episode_files["videos"][video_key] = dataset_root / video_path
 
@@ -168,7 +200,7 @@ class DatasetInfo:
         Returns:
             Video codec (e.g., "av1", "h264")
         """
-        #### Commented out for testing ### 
+        #### Commented out for testing ###
 
         # features = self.data.get("features", {})
         # video_info = features.get(video_key, {})

@@ -10,6 +10,7 @@ Convert LeRobot datasets to MCAP format. The config file is automatically genera
 - **Multi-video support**: Auto-detects and converts all video streams
 - **Terminal log support**: Parses raw `.log` files into `rcl_interfaces/msg/Log` messages with full metadata
 - **ROS2 format**: Outputs ROS2-compatible MCAP files
+- **Cross-compatible**: Supports LeRobot v2.0, v2.1, and v3 dataset formats automatically
 
 ## Architecture
 
@@ -36,6 +37,32 @@ uv run lerobot2mcap download lerobot/pusht -o ./data
 uv run lerobot2mcap download lerobot/pusht -o ./data -e 0 1 2
 ```
 
+### Record Your Own Dataset With a .log File
+If you wish to record a regular dataset without the additional .log file, HuggingFace's tutorials have that covered. To record a dataset while capturing the terminal output, use the following command:
+
+```bash
+LOG_FILE=~/.cache/huggingface/lerobot/${HF_USER}/record-test.log
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/tty.usbmodem5A680114161 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{ 
+    front: {type: opencv, index_or_path: 0, width: 1920, height: 1080, fps: 30},
+    external: {type: opencv, index_or_path: 1, width: 640, height: 480, fps: 15}     
+    }" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/tty.usbmodem5A680123701 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=${HF_USER}/record-test
+    --dataset.episode_time_s=60 \
+    --dataset.reset_time_s=0 \
+    --dataset.num_episodes=1 \
+    --dataset.single_task="recording edge cases" \
+    2>&1 | tee $LOG_FILE
+
+```
+
 ### Convert to MCAP
 
 ```bash
@@ -57,9 +84,39 @@ uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_out
 
 ### Expected Dataset Structure
 
-Video file structure is an example only. Depending on hardware setup subfile names may change.
+The converter automatically detects and supports both LeRobot v2.0, v2.1, and v3 dataset formats. Example input file structures are given below for v3 and v2.1 (very similar to v2). 
 
-Each episode is represented as a separate file (file-000, file-001, file-002, etc.) within a chunk.
+#### LeRobot v3 Format
+
+Multiple episodes will be concatenated into the same files, based on episode and MP4 file size limits defined in the lerobot codebase. The following file structure is an example only; the method and conditions, and recording parameters that data is collected with will dicate how many episodes are merged per file.  
+```
+dataset_root/
+├── meta/
+│   ├── info.json           # Dataset metadata (includes total_episodes)
+│   ├── episodes.jsonl
+│   └── tasks.jsonl
+├── data/
+│   └── chunk-000/
+│       ├── file-000.parquet  # Episode 0-3
+│       ├── file-001.parquet  # Episode 4-5
+│       └── file-002.parquet  # Episode 6-9
+├── videos/
+│   ├── observation.images.front/
+│   │   └── chunk-000/
+│   │       ├── file-000.mp4  # Episode 0-3
+│   │       ├── file-001.mp4  # Episode 4-5
+│   │       └── file-002.mp4  # Episode 6-9
+│   └── observation.images.external/
+│       └── chunk-000/
+│           ├── file-000.mp4  # Episode 0-3
+│           ├── file-001.mp4  # Episode 4-5
+│           └── file-002.mp4  # Episode 6-9
+└── recording.log           # Optional terminal log
+```
+
+#### LeRobot v2.1 Format
+
+Episodes use 6-digit indices (episode_000000, episode_000001, etc.).
 
 ```
 dataset_root/
@@ -69,22 +126,22 @@ dataset_root/
 │   └── tasks.jsonl
 ├── data/
 │   └── chunk-000/
-│       ├── file-000.parquet  # Episode 0
-│       ├── file-001.parquet  # Episode 1
-│       └── file-002.parquet  # Episode 2
-├── videos/
-│   ├── observation.images.front/
-│   │   └── chunk-000/
-│   │       ├── file-000.mp4  # Episode 0
-│   │       ├── file-001.mp4  # Episode 1
-│   │       └── file-002.mp4  # Episode 2
-│   └── observation.images.external/
-│       └── chunk-000/
-│           ├── file-000.mp4  # Episode 0
-│           ├── file-001.mp4  # Episode 1
-│           └── file-002.mp4  # Episode 2
-└── recording.log           # Optional terminal log
+│       ├── episode_000000.parquet  # Episode 0
+│       ├── episode_000001.parquet  # Episode 1
+│       └── episode_000002.parquet  # Episode 2
+└── videos/
+    └── chunk-000/
+        ├── observation.images.phone/
+        │   ├── episode_000000.mp4  # Episode 0
+        │   ├── episode_000001.mp4  # Episode 1
+        │   └── episode_000002.mp4  # Episode 2
+        └── observation.images.external/
+            ├── episode_000000.mp4  # Episode 0
+            ├── episode_000001.mp4  # Episode 1
+            └── episode_000002.mp4  # Episode 2
 ```
+
+**Note**: The converter automatically detects which format your dataset uses from `meta/info.json` and handles it appropriately.
 
 ## Output
 
