@@ -163,9 +163,7 @@ def main():
 
     # Handle download command
     if args.command == "download":
-        download_dir = (
-            Path(args.output_dir) if args.output_dir else Path("./data")
-        )
+        download_dir = Path(args.output_dir) if args.output_dir else Path("./data")
 
         # Download the dataset
         if not download_dataset(args.dataset_id, download_dir, args.episodes):
@@ -182,7 +180,9 @@ def main():
         # Set parameters from convert command arguments
         dataset_root = Path(args.input_dir)
         mcap_output_dir = (
-            Path(args.output_dir) if args.output_dir else dataset_root / "mcap_conversion"
+            Path(args.output_dir)
+            if args.output_dir
+            else dataset_root / "mcap_conversion"
         )
         converter_functions = Path(args.converter_functions)
         chunks = args.chunks
