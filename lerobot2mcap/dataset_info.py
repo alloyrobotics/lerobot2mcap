@@ -192,25 +192,6 @@ class DatasetInfo:
         """Get frames per second from dataset info."""
         return self.data.get("fps", DEFAULT_FPS)
 
-    def get_video_codec(self, video_key: str) -> str:
-        """
-        Get video codec for a specific video stream.
-        Args:
-            video_key: The video key (e.g., "observation.images.front")
-        Returns:
-            Video codec (e.g., "av1", "h264")
-        """
-        #### Commented out for testing ###
-
-        # features = self.data.get("features", {})
-        # video_info = features.get(video_key, {})
-
-        # if isinstance(video_info, dict):
-        #     codec = video_info.get("info", {}).get("video.codec", DEFAULT_CODEC)
-        #     return codec
-
-        return DEFAULT_CODEC
-
     def get_video_frame_id(self, video_key: str) -> str:
         """
         Generate frame_id for a video stream.

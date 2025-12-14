@@ -72,12 +72,6 @@ uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_out
 # Convert specific episodes
 uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_output -e 0 1 2
 
-# Convert specific chunks (for multi-chunk datasets)
-uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_output -c 0 1
-
-# Combine: specific episodes from specific chunks
-uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_output -c 0 -e 0 1 2
-
 # Advanced: Custom converter functions (optional)
 uv run lerobot2mcap convert ~/.cache/huggingface/lerobot/{repo-id} -o ./mcap_output -f ./my_converter_functions.yaml
 ```

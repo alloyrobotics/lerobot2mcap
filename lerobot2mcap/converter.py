@@ -124,22 +124,24 @@ class LeRobotConverter:
         success_count = 0
         fail_count = 0
 
-        for chunk_idx in chunks:
-            for episode_idx in tqdm(
-                episodes,
-                desc=f"Converting episodes in chunk-{chunk_idx:03d}",
-                unit="episode",
-            ):
-                try:
-                    self._convert_episode(
-                        episode_idx, chunk_idx, output_dir, include_log
-                    )
-                    success_count += 1
-                except Exception as e:
-                    logger.warning(
-                        f"Skipping episode {episode_idx} in chunk {chunk_idx}: {e}"
-                    )
-                    fail_count += 1
+        # Create a flat list of (chunk_idx, episode_idx) pairs for all conversions
+        all_conversions = [
+            (chunk_idx, episode_idx) for chunk_idx in chunks for episode_idx in episodes
+        ]
+
+        for chunk_idx, episode_idx in tqdm(
+            all_conversions,
+            desc="Converting episodes",
+            unit="episode",
+        ):
+            try:
+                self._convert_episode(episode_idx, chunk_idx, output_dir, include_log)
+                success_count += 1
+            except Exception as e:
+                logger.warning(
+                    f"Skipping episode {episode_idx} in chunk {chunk_idx}: {e}"
+                )
+                fail_count += 1
 
         # Summary
         logger.info("=" * SEPARATOR_WIDTH)

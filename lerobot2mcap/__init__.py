@@ -17,6 +17,7 @@ logging.basicConfig(
     format="%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
+logger = logging.getLogger(__name__)
 
 # Get the package root directory
 PACKAGE_ROOT = Path(__file__).parent.parent
@@ -27,19 +28,19 @@ def download_dataset(
     dataset_id: str, output_dir: Path, episodes: list[int] | None = None
 ) -> bool:
     """Download a lerobot dataset from Hugging Face Hub."""
-    print(f" Downloading: {dataset_id}")
+    logger.info(f"Downloading: {dataset_id}")
     if episodes:
-        print(f"   Episodes: {episodes}")
-    print(f"   Output: {output_dir}")
+        logger.info(f"  Episodes: {episodes}")
+    logger.info(f"  Output: {output_dir}")
 
     try:
         dataset = LeRobotDataset(dataset_id, root=str(output_dir), episodes=episodes)
-        print(
-            f"✓ Episodes: {dataset.num_episodes}, Frames: {dataset.num_frames}, FPS: {dataset.fps}"
+        logger.info(
+            f"Download complete - Episodes: {dataset.num_episodes}, Frames: {dataset.num_frames}, FPS: {dataset.fps}"
         )
         return True
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logger.error(f"Download failed: {e}")
         return False
 
 
@@ -59,18 +60,15 @@ def convert_dataset(
         dataset_root: Root directory of the LeRobot dataset
         output_dir: Output directory for MCAP files
         converter_functions_path: Path to converter_functions.yaml
-        chunks: List of chunk indices to convert (None = all chunks)
         episodes: List of episode indices to convert (None = all episodes)
     Returns:
         True if conversion succeeded, False otherwise
     """
-    print(f"🔄 Converting: {dataset_root}")
-    if chunks:
-        print(f"   Chunks: {chunks}")
+    logger.info(f"Converting dataset: {dataset_root}")
     if episodes:
-        print(f"   Episodes: {episodes}")
-    print(f"   Output: {output_dir}")
-    print(f"   Converter functions: {converter_functions_path}")
+        logger.info(f"  Episodes: {episodes}")
+    logger.info(f"  Output: {output_dir}")
+    logger.info(f"  Converter functions: {converter_functions_path}")
 
     try:
         # Initialize the converter
@@ -79,7 +77,7 @@ def convert_dataset(
         )
 
         # Show conversion plan
-        print("\n" + converter.get_conversion_plan(chunks))
+        logger.info("\n" + converter.get_conversion_plan(chunks))
 
         # Perform conversion
         success = converter.convert(
@@ -89,10 +87,7 @@ def convert_dataset(
         return success
 
     except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.exception(f"Conversion failed: {e}")
         return False
 
 
@@ -139,13 +134,6 @@ def main():
         help="Output directory for MCAP files (default: input_dir/mcap)",
     )
     convert_parser.add_argument(
-        "-c",
-        "--chunks",
-        type=int,
-        nargs="+",
-        help="Chunk IDs to convert (e.g., 0 1 2). If not specified, all chunks will be converted.",
-    )
-    convert_parser.add_argument(
         "-e",
         "--episodes",
         type=int,
@@ -185,7 +173,7 @@ def main():
             else dataset_root / "mcap_conversion"
         )
         converter_functions = Path(args.converter_functions)
-        chunks = args.chunks
+        chunks = None  # Convert all chunks
         episodes = args.episodes
 
     else:
