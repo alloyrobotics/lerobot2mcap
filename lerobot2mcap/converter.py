@@ -193,10 +193,14 @@ class LeRobotConverter:
         episode_dir.mkdir(parents=True, exist_ok=True)
 
         # Save config file: episode_000/config_000.yaml
+        # Convert Pydantic model to dict for YAML serialization
         config_path = episode_dir / f"config_{episode_idx:03d}.yaml"
         with open(config_path, "w") as config_file:
             yaml.dump(
-                episode_config, config_file, default_flow_style=False, sort_keys=False
+                episode_config.model_dump(mode="python", exclude_none=True),
+                config_file,
+                default_flow_style=False,
+                sort_keys=False,
             )
 
         logger.info(f"Saved config: {config_path.relative_to(output_dir)}")
@@ -236,14 +240,8 @@ class LeRobotConverter:
             f"Video streams: {len(self.dataset_info.video_keys)}",
         ]
 
-        for video_key in self.dataset_info.video_keys:
-            codec = self.dataset_info.get_video_codec(video_key)
-            plan.append(f"  - {video_key} ({codec})")
-
         plan.extend(
             [
-                f"Log file: {'Yes' if self.log_file else 'No'}",
-                "",
                 f"Chunks to convert: {len(chunks)}",
                 "",
             ]
