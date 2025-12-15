@@ -3,20 +3,15 @@ Parses the info.json file to extract metadata about the dataset,"""
 
 import json
 import logging
+import math
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Default values for dataset metadata
-DEFAULT_FPS = 30
-DEFAULT_CODEC = "h264"
+# Official LeRobot defaults (from lerobot.datasets.utils)
+DEFAULT_CHUNK_SIZE = 1000  # Max number of episodes per chunk
+DEFAULT_CODEC = "h264"  # Default video codec if not specified
 DEFAULT_FILE_INDEX = 0  # First file in a chunk
-DEFAULT_DATA_PATH_TEMPLATE = (
-    "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
-)
-DEFAULT_VIDEO_PATH_TEMPLATE = (
-    "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4"
-)
 
 
 class DatasetInfo:
@@ -57,9 +52,18 @@ class DatasetInfo:
         Extract video keys from features.
         Video features have dtype="video" in info.json.
         Example: "observation.images.front", "observation.images.external"
+
+        Raises:
+            KeyError: If 'features' field is missing from info.json
         """
+        if "features" not in self.data:
+            raise KeyError(
+                f"Required field 'features' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+
         video_keys = []
-        features = self.data.get("features", {})
+        features = self.data["features"]
 
         for feature_name, feature_info in features.items():
             if isinstance(feature_info, dict) and feature_info.get("dtype") == "video":
@@ -71,17 +75,40 @@ class DatasetInfo:
     def data_path_template(self) -> str:
         """
         Get the data (parquet) path template from dataset metadata.
-        Checking data_path value for robustness - falls back to default if not in info.json.
+
+        Returns:
+            Path template string (e.g., "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet")
+
+        Raises:
+            KeyError: If 'data_path' field is missing from info.json
         """
-        return self.data.get("data_path", DEFAULT_DATA_PATH_TEMPLATE)
+        if "data_path" not in self.data:
+            raise KeyError(
+                f"Required field 'data_path' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+        return self.data["data_path"]
 
     @property
     def video_path_template(self) -> str:
         """
         Get the video path template from dataset metadata.
-        Checking video_path value for robustness - falls back to default if not in info.json.
+
+        Returns:
+            Path template string (e.g., "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4")
+
+        Raises:
+            KeyError: If 'video_path' field is missing from info.json when video features exist
         """
-        return self.data.get("video_path", DEFAULT_VIDEO_PATH_TEMPLATE)
+        if "video_path" not in self.data:
+            if self.video_keys:  # Only required if dataset has video features
+                raise KeyError(
+                    f"Required field 'video_path' not found in {self.info_json_path}. "
+                    "This field is required when the dataset contains video features."
+                )
+            # Return empty string if no videos (though this shouldn't be called in that case)
+            return ""
+        return self.data["video_path"]
 
     def get_chunk_files(self, chunk_index: int, dataset_root: Path) -> dict:
         """
@@ -183,14 +210,117 @@ class DatasetInfo:
     def get_total_chunks(self) -> int:
         """
         Get total number of chunks in the dataset.
-        Assumes single chunk (chunk-000) structure for LeRobot datasets.
-        Keeping function here as a placeholder for future multi-chunk support if necessary.
+
+        Calculates from metadata using: ceil(total_episodes / chunks_size)
+        where chunks_size is the maximum number of episodes per chunk.
+
+        Returns:
+            Number of chunks in the dataset (minimum 1)
+
+        Raises:
+            KeyError: If 'total_episodes' field is missing from info.json
         """
+        if "total_episodes" not in self.data:
+            raise KeyError(
+                f"Required field 'total_episodes' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+
+        total_episodes = self.data["total_episodes"]
+        # chunks_size has an official default value
+        chunks_size = self.data.get("chunks_size", DEFAULT_CHUNK_SIZE)
+
+        if total_episodes > 0 and chunks_size > 0:
+            return math.ceil(total_episodes / chunks_size)
+
+        # Fallback to 1 chunk if calculation not possible
         return 1
 
     def get_fps(self) -> int:
-        """Get frames per second from dataset info."""
-        return self.data.get("fps", DEFAULT_FPS)
+        """
+        Get frames per second from dataset info.
+
+        Returns:
+            Frames per second as an integer
+
+        Raises:
+            KeyError: If 'fps' field is missing from info.json
+        """
+        if "fps" not in self.data:
+            raise KeyError(
+                f"Required field 'fps' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+        return self.data["fps"]
+
+    def get_codebase_version(self) -> str:
+        """
+        Get the LeRobot codebase version (dataset format version).
+
+        This indicates the schema version of the dataset and parquet files.
+        Examples: "v2.0", "v2.1", "v3.0"
+
+        Returns:
+            Codebase version string
+
+        Raises:
+            KeyError: If 'codebase_version' field is missing from info.json
+        """
+        if "codebase_version" not in self.data:
+            raise KeyError(
+                f"Required field 'codebase_version' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets to identify the dataset format version."
+            )
+        return self.data["codebase_version"]
+
+    def get_writer_format(self) -> str:
+        """
+        Get MCAP writer format from dataset metadata.
+
+        Returns:
+            Writer format (e.g., "ros1", "ros2", "json", "protobuf")
+            Defaults to "ros2" for LeRobot datasets.
+        """
+        return self.data.get("writer_format", "ros2")
+
+    def get_video_codec(self, video_key: str) -> str:
+        """
+        Get video codec for a specific video stream.
+
+        Looks up codec in features metadata for the given video_key.
+        Falls back to DEFAULT_CODEC if not specified.
+
+        Args:
+            video_key: The video key (e.g., "observation.images.front")
+
+        Returns:
+            Video codec (e.g., "h264", "h265", "vp9", "av1")
+
+        Raises:
+            KeyError: If 'features' field is missing from info.json
+        """
+        if "features" not in self.data:
+            raise KeyError(
+                f"Required field 'features' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+
+        features = self.data["features"]
+        if video_key in features:
+            video_info = features[video_key]
+            if isinstance(video_info, dict):
+                # Check in the 'info' sub-dict first (LeRobot v2.x/v3.x format)
+                if "info" in video_info and isinstance(video_info["info"], dict):
+                    codec = video_info["info"].get("video.codec", DEFAULT_CODEC)
+                else:
+                    codec = video_info.get("codec", DEFAULT_CODEC)
+
+                # Validate codec is one of the supported formats
+                if codec in ("h264", "h265", "vp9", "av1"):
+                    return codec
+
+        # Fallback to default codec
+        return DEFAULT_CODEC
 
     def get_video_frame_id(self, video_key: str) -> str:
         """
@@ -206,12 +336,26 @@ class DatasetInfo:
         return f"{camera_name}_camera"
 
     def get_total_episodes(self) -> int:
-        """Get total number of episodes in the dataset."""
-        return self.data.get("total_episodes", 0)
+        """
+        Get total number of episodes in the dataset.
+
+        Returns:
+            Total number of episodes as an integer
+
+        Raises:
+            KeyError: If 'total_episodes' field is missing from info.json
+        """
+        if "total_episodes" not in self.data:
+            raise KeyError(
+                f"Required field 'total_episodes' not found in {self.info_json_path}. "
+                "This field is required in LeRobot datasets."
+            )
+        return self.data["total_episodes"]
 
     def __repr__(self) -> str:
         return (
-            f"DatasetInfo(episodes={self.get_total_episodes()}, "
+            f"DatasetInfo(version={self.get_codebase_version()}, "
+            f"episodes={self.get_total_episodes()}, "
             f"chunks={self.get_total_chunks()}, "
             f"fps={self.get_fps()}, "
             f"videos={len(self.video_keys)})"

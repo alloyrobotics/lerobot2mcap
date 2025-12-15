@@ -2,7 +2,7 @@
 
 import logging
 
-# from pathlib import Path TO DO: check why currently this is unused
+# from pathlib import Path
 from tabular2mcap.loader.models import (
     AttachmentConfig,
     CompressedVideoMappingConfig,
@@ -32,10 +32,10 @@ class ConfigGenerator:
         """
         self.dataset_info = dataset_info
 
-        # Create a base template config with default values
+        # Create a base template config with default values from metadata
         # This will be copied and modified for each episode
         self._base_config_template = McapConversionConfig(
-            writer_format="ros2",
+            writer_format=dataset_info.get_writer_format(),
             tabular_mappings=[],
             other_mappings=[],
             attachments=[],
