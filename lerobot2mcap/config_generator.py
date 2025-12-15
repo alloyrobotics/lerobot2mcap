@@ -112,7 +112,7 @@ class ConfigGenerator:
         return config
 
     def generate_episode_config(
-        self, episode_index: int, chunk_index: int, include_log: bool = False
+        self, episode_index: int, chunk_index: int, include_log: bool = True
     ) -> dict:
         """
         Generate configuration dictionary for a specific episode.
@@ -120,7 +120,8 @@ class ConfigGenerator:
         Args:
             episode_index: The episode index (used as file_index in paths)
             chunk_index: The chunk index
-            include_log: Whether to include log file as MCAP attachment
+            include_log: Whether to include log file as MCAP attachment (default: True,
+                tabular2mcap will auto-detect if the file exists)
 
         Returns:
             Configuration dictionary compatible with McapConversionConfig

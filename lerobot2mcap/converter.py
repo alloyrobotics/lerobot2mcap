@@ -47,7 +47,7 @@ class LeRobotConverter:
         if self.log_file:
             logger.info(f"Found log file: {self.log_file}")
         else:
-            logger.warning("No log file found in dataset root")
+            logger.info("No log file found in dataset root")
 
         logger.info(f"Initialized converter for {self.dataset_info}")
 
@@ -114,12 +114,6 @@ class LeRobotConverter:
         else:
             logger.info(f"Converting episodes: {episodes}")
 
-        # Check if log file exists (tabular2mcap will handle parsing)
-        include_log = False
-        if self.log_file is not None and self.log_file.exists():
-            include_log = True
-            logger.info(f"Log file will be included: {self.log_file.name}")
-
         # Convert each episode within each chunk
         success_count = 0
         fail_count = 0
@@ -135,7 +129,7 @@ class LeRobotConverter:
             unit="episode",
         ):
             try:
-                self._convert_episode(episode_idx, chunk_idx, output_dir, include_log)
+                self._convert_episode(episode_idx, chunk_idx, output_dir)
                 success_count += 1
             except Exception as e:
                 logger.warning(
@@ -156,7 +150,7 @@ class LeRobotConverter:
         return success_count > 0
 
     def _convert_episode(
-        self, episode_idx: int, chunk_idx: int, output_dir: Path, include_log: bool
+        self, episode_idx: int, chunk_idx: int, output_dir: Path
     ):
         """
         Convert a single episode to MCAP.
@@ -164,7 +158,6 @@ class LeRobotConverter:
             episode_idx: The episode index (used as file_index)
             chunk_idx: The chunk index
             output_dir: Output directory for MCAP files
-            include_log: Whether to include log file in conversion
         Raises:
             Exception: If episode conversion fails
         """
@@ -192,7 +185,7 @@ class LeRobotConverter:
 
         # Generate dynamic configuration for this episode
         episode_config = self.config_generator.generate_episode_config(
-            episode_idx, chunk_idx, include_log=include_log
+            episode_idx, chunk_idx
         )
 
         # Create episode directory: mcap_output/episode_000/
