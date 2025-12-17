@@ -7,10 +7,10 @@ Convert LeRobot datasets to MCAP format with automatic configuration generation 
 - **Automatic configuration**: Reads `meta/info.json` and generates all necessary configuration using Pydantic models for type safety
 - **Episode-based conversion**: Converts each episode to a separate MCAP file in its own directory
 - **Chunk-aware**: Handles datasets organized in chunks (supports datasets with 1000+ episodes)
-- **Multi-video support**: Auto-detects and converts all video streams with codec validation
+- **Multi-video support**: Auto-detects and converts all video streams
 - **Terminal log support**: Parses raw `.log` files into `rcl_interfaces/msg/Log` messages with full metadata
 - **ROS2 format**: Outputs ROS2-compatible MCAP files (configurable via metadata)
-- **Cross-compatible**: Supports LeRobot v2.0, v2.1, and v3 dataset formats automatically
+- **Cross-compatible**: Supports LeRobot v2.0, v2.1 dataset formats automatically, with partial support for v3.0
 - **Metadata-driven**: Reads FPS, video codecs, writer format, and chunk size from dataset metadata
 
 ## Installation
@@ -40,7 +40,7 @@ pip install -e .
 
 ## Requirements
 
-Your LeRobot dataset must have the following structure:
+Your LeRobot dataset should have the following structure:
 
 ```
 dataset_root/
@@ -67,11 +67,7 @@ The converter reads the following fields from `meta/info.json`:
 
 ### Video Codec Support
 
-Video codecs are read from the `features` section of `info.json`. Supported formats:
-- `h264` (default)
-- `h265`
-- `vp9`
-- `av1`
+The converter uses the h264 video codec. If another codec is desired this can be done by changing `DEFAULT_CODEC` in `dataset_info.py`.
 
 ## Architecture
 
@@ -218,11 +214,11 @@ mv $LOG_FILE ~/.cache/huggingface/lerobot/${HF_USER}/my-dataset/recording.log
 
 ### Expected Dataset Structure
 
-The converter automatically detects and supports both LeRobot v2.0, v2.1, and v3 dataset formats. Example input file structures are given below for v3 and v2.1 (very similar to v2). 
+The converter automatically detects and supports both LeRobot v2.0, v2.1 dataset formats, and has partial support for the v3 dataset format. Example input file structures are given below for v3 and v2.1 (very similar to v2). 
 
 #### LeRobot v3 Format
 
-Multiple episodes will be concatenated into the same files, based on episode and MP4 file size limits defined in the lerobot codebase. The following file structure is an example only; the method and conditions, and recording parameters that data is collected with will dicate how many episodes are merged per file.  
+Im Lerobot dataset v3.0 multiple episodes are concatenated into the same files, based on episode and MP4 file size limits defined in the lerobot codebase. The following file structure is an example only; the method and conditions, and recording parameters that data is collected with will dicate how many episodes are merged per file. It should be noted that the seperation of these files back into seperate episodes is not yet supported.
 ```
 dataset_root/
 ├── meta/
@@ -338,6 +334,10 @@ functions:
 ```
 
 **Note**: Log parsing is handled automatically by tabular2mcap's `LogConverter` - no converter function needed.
+
+## Future Work 
+Lerobot dataset v3.0 file splitting into individual episodes is yet to be added to this repository. 
+
 
 ## Development
 

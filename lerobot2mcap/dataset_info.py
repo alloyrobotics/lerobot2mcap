@@ -131,27 +131,35 @@ class DatasetInfo:
         """
         chunk_files = {}
 
-        # Get parquet file path using property (checks info.json with fallback)
-        # Support both v2.1 and v3 naming conventions
-        parquet_path = self.data_path_template.format(
-            episode_chunk=chunk_index,  # v2.1 format
-            episode_index=DEFAULT_FILE_INDEX,  # v2.1 format
-            chunk_index=chunk_index,  # v3 format
-            file_index=DEFAULT_FILE_INDEX,  # v3 format
-        )
+        # Determine format parameters based on dataset version
+        version = self.get_codebase_version()
+        if version.startswith("v2"):
+            # v2.1 format: use episode_chunk and episode_index, null out v3 params
+            format_params = {
+                "episode_chunk": chunk_index,
+                "episode_index": DEFAULT_FILE_INDEX,
+                "chunk_index": None,
+                "file_index": None,
+            }
+        else:
+            # v3.0+ format: use chunk_index and file_index, null out v2 params
+            format_params = {
+                "episode_chunk": None,
+                "episode_index": None,
+                "chunk_index": chunk_index,
+                "file_index": DEFAULT_FILE_INDEX,
+            }
+
+        # Get parquet file path
+        parquet_path = self.data_path_template.format(**format_params)
         chunk_files["parquet"] = dataset_root / parquet_path
 
-        # Get video file paths using property (checks info.json with fallback)
+        # Get video file paths
         chunk_files["videos"] = {}
-
         for video_key in self.video_keys:
-            # Support both v2.1 and v3 naming conventions
             video_path = self.video_path_template.format(
                 video_key=video_key,
-                episode_chunk=chunk_index,  # v2.1 format
-                episode_index=DEFAULT_FILE_INDEX,  # v2.1 format
-                chunk_index=chunk_index,  # v3 format
-                file_index=DEFAULT_FILE_INDEX,  # v3 format
+                **format_params,
             )
             chunk_files["videos"][video_key] = dataset_root / video_path
 
@@ -181,27 +189,35 @@ class DatasetInfo:
         """
         episode_files = {}
 
-        # Get parquet file path using episode_index as file_index
-        # Support both v2.1 and v3 naming conventions
-        parquet_path = self.data_path_template.format(
-            episode_chunk=chunk_index,  # v2.1 format
-            episode_index=episode_index,  # v2.1 format
-            chunk_index=chunk_index,  # v3 format
-            file_index=episode_index,  # v3 format
-        )
+        # Determine format parameters based on dataset version
+        version = self.get_codebase_version()
+        if version.startswith("v2"):
+            # v2.1 format: use episode_chunk and episode_index, null out v3 params
+            format_params = {
+                "episode_chunk": chunk_index,
+                "episode_index": episode_index,
+                "chunk_index": None,
+                "file_index": None,
+            }
+        else:
+            # v3.0+ format: use chunk_index and file_index, null out v2 params
+            format_params = {
+                "episode_chunk": None,
+                "episode_index": None,
+                "chunk_index": chunk_index,
+                "file_index": episode_index,
+            }
+
+        # Get parquet file path
+        parquet_path = self.data_path_template.format(**format_params)
         episode_files["parquet"] = dataset_root / parquet_path
 
-        # Get video file paths using episode_index as file_index
+        # Get video file paths
         episode_files["videos"] = {}
-
         for video_key in self.video_keys:
-            # Support both v2.1 and v3 naming conventions
             video_path = self.video_path_template.format(
                 video_key=video_key,
-                episode_chunk=chunk_index,  # v2.1 format
-                episode_index=episode_index,  # v2.1 format
-                chunk_index=chunk_index,  # v3 format
-                file_index=episode_index,  # v3 format
+                **format_params,
             )
             episode_files["videos"][video_key] = dataset_root / video_path
 
