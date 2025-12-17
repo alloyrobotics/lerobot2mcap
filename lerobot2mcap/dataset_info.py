@@ -1,5 +1,24 @@
 """Dataset information parser for LeRobot datasets.
-Parses the info.json file to extract metadata about the dataset,"""
+Parses the info.json file to extract metadata about the dataset.
+
+TODO: v3.0 Episode Separation (Future PR)
+    LeRobot v3.0 datasets merge multiple episodes into single parquet/video files.
+    Current implementation assumes 1 episode = 1 file (v2.x behavior).
+    To support v3.0 properly:
+    1. Parse meta/episodes.jsonl to get episode boundaries (start_frame, length)
+    2. Filter parquet data by episode_index column before conversion
+    3. Implement video slicing by frame range (or reference frame indices in MCAP)
+    4. Update get_episode_files() to return frame ranges instead of file paths
+
+TODO: Boilerplate Reduction (Low Priority)
+    Consider using Pydantic model or __getattr__ to reduce repetitive getter methods.
+    See REVIEW.md for suggested approaches.
+
+TODO: Add validate_files() Method (Low Priority)
+    Optional method to verify files exist on disk before conversion:
+    def validate_files(self, dataset_root: Path) -> dict:
+        Returns {"missing_parquet": [...], "missing_videos": {...}, "extra_files": [...]}
+"""
 
 import json
 import logging
