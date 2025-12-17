@@ -283,45 +283,6 @@ class DatasetInfo:
         """
         return self.data.get("writer_format", "ros2")
 
-    def get_video_codec(self, video_key: str) -> str:
-        """
-        Get video codec for a specific video stream.
-
-        Looks up codec in features metadata for the given video_key.
-        Falls back to DEFAULT_CODEC if not specified.
-
-        Args:
-            video_key: The video key (e.g., "observation.images.front")
-
-        Returns:
-            Video codec (e.g., "h264", "h265", "vp9", "av1")
-
-        Raises:
-            KeyError: If 'features' field is missing from info.json
-        """
-        if "features" not in self.data:
-            raise KeyError(
-                f"Required field 'features' not found in {self.info_json_path}. "
-                "This field is required in LeRobot datasets."
-            )
-
-        features = self.data["features"]
-        if video_key in features:
-            video_info = features[video_key]
-            if isinstance(video_info, dict):
-                # Check in the 'info' sub-dict first (LeRobot v2.x/v3.x format)
-                if "info" in video_info and isinstance(video_info["info"], dict):
-                    codec = video_info["info"].get("video.codec", DEFAULT_CODEC)
-                else:
-                    codec = video_info.get("codec", DEFAULT_CODEC)
-
-                # Validate codec is one of the supported formats
-                if codec in ("h264", "h265", "vp9", "av1"):
-                    return codec
-
-        # Fallback to default codec
-        return DEFAULT_CODEC
-
     def get_video_frame_id(self, video_key: str) -> str:
         """
         Generate frame_id for a video stream.

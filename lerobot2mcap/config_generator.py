@@ -11,7 +11,7 @@ from tabular2mcap.loader.models import (
     TabularMappingConfig,
 )
 
-from .dataset_info import DatasetInfo
+from .dataset_info import DEFAULT_CODEC, DatasetInfo
 
 logger = logging.getLogger(__name__)
 
@@ -176,8 +176,8 @@ class ConfigGenerator:
         mappings = []
 
         for video_key in self.dataset_info.video_keys:
-            # Get codec for this video stream
-            video_format = self.dataset_info.get_video_codec(video_key)
+            # Always use h264 codec for optimal speed
+            video_format = DEFAULT_CODEC
 
             # Generate video file pattern for specific episode (no wildcards)
             video_pattern = self._format_episode_pattern(
